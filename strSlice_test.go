@@ -64,7 +64,22 @@ type User struct {
 func TestScan(t *testing.T) {
 	var (
 		err error
-		su  = &User{ID: 8}
+		su  = &User{ID: 10}
+
+		originData = &User{Names: []string{
+			"123",
+			`aaa"bbb`,
+			`aa""bn`,
+			`cc\"dd`,
+			`eee'ff`,
+			`ggg''hh`,
+			`iii\'jj`,
+			`ii\\\jj`,
+			`{dadkaj}`,
+			`dbdb}`,
+			"{hdjad",
+			`\,"'}{`,
+		}}
 	)
 
 	initDB()
@@ -74,4 +89,52 @@ func TestScan(t *testing.T) {
 	}
 
 	log.Printf("scan user: %+v", *su)
+
+	compairOriAndGot(originData.Names, su.Names)
+}
+
+func TestValue(t *testing.T) {
+	var (
+		err error
+	)
+
+	initDB()
+
+	nu := &User{Names: []string{
+		"123",
+		`aaa"bbb`,
+		`aa""bn`,
+		`cc\"dd`,
+		`eee'ff`,
+		`ggg''hh`,
+		`iii\'jj`,
+		`ii\\\jj`,
+		`{dadkaj}`,
+		`dbdb}`,
+		"{hdjad",
+		`\,"'}{`,
+	}}
+
+	if err = db.Create(nu).Error; err != nil {
+		t.Errorf("gorm create err: %v", nu)
+	}
+}
+
+func compairOriAndGot(ori, got []string) {
+	var (
+		length = len(ori)
+	)
+
+	if len(ori) != len(got) {
+		log.Printf("x => 长度不一致")
+		if len(ori) < len(got) {
+			length = len(ori)
+		} else {
+			length = len(got)
+		}
+	}
+
+	for idx := 0; idx < length; idx++ {
+		log.Printf("O => 原始: %s, 现在: %s", ori[idx], got[idx])
+	}
 }

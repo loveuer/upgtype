@@ -3,9 +3,9 @@ package upgtype
 import (
 	"bytes"
 	"database/sql/driver"
+	"encoding/json"
 	"fmt"
 	"reflect"
-	"strings"
 )
 
 type StrSlice []string
@@ -17,35 +17,56 @@ func (s *StrSlice) Scan(val interface{}) error {
 		return fmt.Errorf("db value not string, but %T", val)
 	}
 
-	str = strings.TrimRight(strings.TrimLeft(str, "{"), "}")
+	if len(str) == 0 {
+		return nil
+	}
+
+	if str[0] == '{' && str[len(str)-1] == '}' {
+		str = str[1 : len(str)-1]
+	}
 
 	if len(str) == 0 {
 		return nil
 	}
 
-	strs := make([]string, 0)
-	one := make([]byte, 0)
-	quotation := 0
+	bs := make([]byte, 0)
+	bss := make([][]byte, 0)
 
-	for idx := range str {
-		if str[idx] == '"' {
-			quotation++
-			one = append(one, str[idx])
-		} else if str[idx] == ',' {
-			if quotation%2 != 0 {
-				one = append(one, str[idx])
-				continue
+	for idx := 0; idx < len(str); idx++ {
+
+		if str[idx] == ',' && str[idx-1] != 92 {
+
+			if bs[0] != '"' || bs[len(bs)-1] != '"' {
+				bs = append(bs, '"')
+				bss = append(bss, append([]byte{'"'}, bs...))
+			} else {
+				bss = append(bss, bs)
 			}
 
-			strs = append(strs, string(dropQuotedAndBS(one)))
-			one = make([]byte, 0)
-
+			bs = make([]byte, 0)
 		} else {
-			one = append(one, str[idx])
+			bs = append(bs, str[idx])
 		}
+
 	}
 
-	strs = append(strs, string(dropQuotedAndBS(one)))
+	if bs[0] != '"' || bs[len(bs)-1] != '"' {
+		bs = append(bs, '"')
+		bss = append(bss, append([]byte{'"'}, bs...))
+	} else {
+		bss = append(bss, bs)
+	}
+
+	strs := make([]string, 0, len(bss))
+	for idx := range bss {
+
+		var newStr string
+		if err := json.Unmarshal(bss[idx], &newStr); err != nil {
+			continue
+		}
+
+		strs = append(strs, newStr)
+	}
 
 	reflect.ValueOf(s).Elem().Set(reflect.ValueOf(strs))
 
